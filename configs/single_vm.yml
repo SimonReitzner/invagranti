@@ -1,0 +1,8 @@
+vagrant:
+  vms:
+    - vm_name: "vm3"
+      hostname: "vm3-host"
+      provider:
+        virtualbox:
+          cpus: 2
+      post_up_message: "VM3 is running!"

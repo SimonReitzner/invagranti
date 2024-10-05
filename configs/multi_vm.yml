@@ -1,0 +1,26 @@
+vagrant:
+  global:
+    box: "ubuntu/bionic64"
+    provider:
+      virtualbox:
+        memory: "1024"
+        cpus: 1
+
+  vms:
+    - vm_name: "vm1"
+      hostname: "vm1-host"
+      network:
+        forwarded_port:
+          guest: 8081
+          host: 9090
+      provider:
+        virtualbox:
+          memory: "512"
+      post_up_message: "VM1 is running with custom settings!"
+    
+    - vm_name: "vm2"
+      hostname: "vm2-host"
+      provider:
+        virtualbox:
+          cpus: 2
+      post_up_message: "VM2 is running!"
