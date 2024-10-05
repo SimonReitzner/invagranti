@@ -1,26 +1,41 @@
 vagrant:
   global:
     box: "ubuntu/bionic64"
-    provider:
-      virtualbox:
-        memory: "1024"
-        cpus: 1
-
   vms:
-    - vm_name: "vm1"
-      hostname: "vm1-host"
+    - vm_name: "web-server"
+      hostname: "web-server"
       network:
         forwarded_port:
-          guest: 8081
-          host: 9090
+          guest: 80
+          host: 8080
+        private_network:
+          ip: "192.168.56.10"
       provider:
         virtualbox:
-          memory: "512"
-      post_up_message: "VM1 is running with custom settings!"
-    
-    - vm_name: "vm2"
-      hostname: "vm2-host"
-      provider:
-        virtualbox:
+          memory: 2048
           cpus: 2
-      post_up_message: "VM2 is running!"
+      provision:
+        shell:
+          - inline: "echo Hello World"
+            privileged: true
+            name: "Print Hello World"
+        ansible:
+          playbook: "provisioning/playbook.yml"
+          inventory: "provisioning/inventory"
+          config_file: "provisioning/ansible.cfg"
+          extra_vars:
+            env: "staging"
+          verbose: true
+      post_up_message: "web-server is running!"
+
+    - vm_name: "db-server"
+      hostname: "db-server"
+      provider:
+        virtualbox:
+          memory: 1024
+          cpus: 1
+      provision:
+        shell:
+          - inline: "apt-get update && apt-get install -y mysql-server"
+            privileged: true
+      post_up_message: "db-server is running!"

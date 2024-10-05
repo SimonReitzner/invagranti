@@ -1,7 +1,8 @@
 require 'yaml'
+require 'fileutils'
 
-# Define the folder where YAML config files are stored
-config_folder = 'configs/'
+# Define the default path for YAML config files (can be overridden by a specific file)
+config_path = ENV['CONFIG_PATH'] || 'configs/'
 
 # Function to merge nested configuration hashes
 def merge_config(default_config, override_config)
@@ -25,6 +26,7 @@ default_config = {
   'provider' => {
     'virtualbox' => { 'memory' => '1024', 'cpus' => 2, 'gui' => false, 'customize' => [] }
   },
+  'provision' => {},  # Placeholder for provisioners
   'post_up_message' => "Your VM is up and running!"
 }
 
@@ -48,8 +50,18 @@ def load_vm_configs(file, default_config)
   end
 end
 
-# Read all YAML (.yml and .yaml) files in the config folder
-vm_configs = Dir[File.join(config_folder, '*.{yml,yaml}')].flat_map { |file| load_vm_configs(file, default_config) }
+# Determine if the provided config_path is a directory or a file
+vm_configs = []
+
+if File.directory?(config_path)
+  # Read all YAML (.yml and .yaml) files in the directory
+  vm_configs = Dir[File.join(config_path, '*.{yml,yaml}')].flat_map { |file| load_vm_configs(file, default_config) }
+elsif File.file?(config_path)
+  # Load configuration from the single YAML file
+  vm_configs = load_vm_configs(config_path, default_config)
+else
+  raise "Invalid CONFIG_PATH: '#{config_path}' is neither a file nor a directory."
+end
 
 # Configure each VM based on its respective YAML configuration
 Vagrant.configure("2") do |config|
@@ -90,6 +102,41 @@ Vagrant.configure("2") do |config|
         if vm_config['provider']['virtualbox']['customize']
           vm_config['provider']['virtualbox']['customize'].each do |custom|
             vb.customize custom
+          end
+        end
+      end
+
+      # Provisioning Configuration
+      if vm_config['provision']
+
+        # Shell provisioner
+        if vm_config['provision']['shell']
+          vm_config['provision']['shell'].each do |shell_config|
+            vm.vm.provision "shell" do |sh|
+              sh.inline = shell_config['inline'] if shell_config['inline']
+              sh.path = shell_config['path'] if shell_config['path']
+              sh.args = shell_config['args'] if shell_config['args']
+              sh.privileged = shell_config['privileged'] unless shell_config['privileged'].nil?
+              sh.upload_path = shell_config['upload_path'] if shell_config['upload_path']
+              sh.keep_color = shell_config['keep_color'] if shell_config['keep_color']
+              sh.name = shell_config['name'] if shell_config['name']
+            end
+          end
+        end
+
+        # Ansible provisioner
+        if vm_config['provision']['ansible']
+          vm.vm.provision "ansible" do |ansible|
+            ansible.playbook = vm_config['provision']['ansible']['playbook'] if vm_config['provision']['ansible']['playbook']
+            ansible.inventory_path = vm_config['provision']['ansible']['inventory'] if vm_config['provision']['ansible']['inventory']
+            ansible.config_file = vm_config['provision']['ansible']['config_file'] if vm_config['provision']['ansible']['config_file']
+            ansible.limit = vm_config['provision']['ansible']['limit'] if vm_config['provision']['ansible']['limit']
+            ansible.become = vm_config['provision']['ansible']['become'] unless vm_config['provision']['ansible']['become'].nil?
+            ansible.extra_vars = vm_config['provision']['ansible']['extra_vars'] if vm_config['provision']['ansible']['extra_vars']
+            ansible.verbose = vm_config['provision']['ansible']['verbose'] if vm_config['provision']['ansible']['verbose']
+            ansible.galaxy_roles_path = vm_config['provision']['ansible']['galaxy_roles_path'] if vm_config['provision']['ansible']['galaxy_roles_path']
+            ansible.galaxy_role_file = vm_config['provision']['ansible']['galaxy_role_file'] if vm_config['provision']['ansible']['galaxy_role_file']
+            ansible.install = vm_config['provision']['ansible']['install'] unless vm_config['provision']['ansible']['install'].nil?
           end
         end
       end
